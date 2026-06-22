@@ -13,7 +13,7 @@ PC（Mac）を閉じていても、スマホからやることボードの中身
 
 ## 公開URL
 
-https://imai-design.github.io/yarukoto-snapshot/
+https://imai-design.github.io/yb-1a659991/
 
 合言葉は `passphrase.txt`（このディレクトリ・gitignore済みでローカルのみ）。変更したいときはこのファイルを書き換えて次回 publish で反映。
 
