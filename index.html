@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta name="theme-color" content="#0b0d10">
+<title>やることボード（閲覧版）</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#14171c; --panel2:#1b1f26; --line:#262b33;
+    --fg:#e8ecf1; --mut:#8a94a3; --accent:#5b8cff; --hot:#ff5d5d; --warn:#ffb454; --ok:#3ecf8e;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
+    -webkit-text-size-adjust:100%}
+  .wrap{max-width:760px;margin:0 auto;padding:16px 14px 64px}
+  header{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:6px 2px 14px}
+  header h1{font-size:18px;margin:0;letter-spacing:.02em}
+  .upd{color:var(--mut);font-size:12px}
+  .ro{margin-left:auto;font-size:11px;color:var(--mut);border:1px solid var(--line);
+    padding:3px 8px;border-radius:999px}
+  /* gate */
+  #gate{max-width:380px;margin:14vh auto 0;padding:24px 22px;background:var(--panel);
+    border:1px solid var(--line);border-radius:16px}
+  #gate h2{font-size:16px;margin:0 0 6px}
+  #gate p{color:var(--mut);font-size:13px;margin:0 0 16px;line-height:1.6}
+  #pass{width:100%;padding:12px 13px;font-size:16px;background:var(--panel2);
+    border:1px solid var(--line);border-radius:10px;color:var(--fg);outline:none}
+  #pass:focus{border-color:var(--accent)}
+  #go{width:100%;margin-top:12px;padding:12px;font-size:15px;font-weight:600;border:0;
+    border-radius:10px;background:var(--accent);color:#fff;cursor:pointer}
+  #go:active{transform:translateY(1px)}
+  #err{color:var(--hot);font-size:13px;min-height:18px;margin-top:10px}
+  /* kpis */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:8px;margin:0 0 16px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 8px;text-align:center}
+  .kpi b{display:block;font-size:20px;line-height:1.1}
+  .kpi span{font-size:11px;color:var(--mut)}
+  /* sections */
+  section{margin:0 0 18px}
+  .sh{display:flex;align-items:center;gap:8px;margin:0 2px 8px}
+  .sh h3{font-size:14px;margin:0}
+  .sh .c{font-size:12px;color:var(--mut);background:var(--panel2);border:1px solid var(--line);
+    border-radius:999px;padding:1px 9px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:11px 12px;margin:0 0 8px}
+  .card .t{font-size:14px;line-height:1.45}
+  .card .m{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
+  .tag{font-size:11px;color:var(--mut)}
+  .badge{font-size:11px;padding:1px 8px;border-radius:999px;border:1px solid var(--line)}
+  .b-prog{color:#cfe0ff;border-color:#33457a;background:#162038}
+  .b-todo{color:#ffe2bd;border-color:#5a4321;background:#2a2113}
+  .note{color:var(--mut);font-size:12px;margin-top:5px;line-height:1.5}
+  .empty{color:var(--mut);font-size:13px;padding:8px 2px}
+  footer{color:var(--mut);font-size:11px;text-align:center;margin-top:22px;line-height:1.7}
+  .lo{color:var(--mut);font-size:12px;background:none;border:0;text-decoration:underline;cursor:pointer}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div id="gate">
+    <h2>やることボード（閲覧版）</h2>
+    <p>合言葉を入れると、最新のやることボードが表示されます。<br>中身は暗号化されていて、合言葉なしでは読めません。</p>
+    <input id="pass" type="password" inputmode="text" autocomplete="off" placeholder="合言葉" autofocus>
+    <button id="go">ひらく</button>
+    <div id="err"></div>
+  </div>
+
+  <div id="app" class="hidden">
+    <header>
+      <h1>やることボード</h1>
+      <span class="upd" id="upd"></span>
+      <span class="ro">閲覧専用・操作はMacのボードで</span>
+    </header>
+    <div class="kpis" id="kpis"></div>
+    <div id="sections"></div>
+    <footer>
+      PC OFF中でも見られるスナップショットです。最新化はMac起動中に自動。<br>
+      <button class="lo" id="logout">合言葉を消す</button>
+    </footer>
+  </div>
+
+</div>
+<script>
+const $=s=>document.querySelector(s);
+function b64ToBytes(b64){const bin=atob(b64);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u;}
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+
+async function fetchPayload(){
+  const r=await fetch("./payload.json?ts="+Date.now(),{cache:"no-store"});
+  if(!r.ok) throw new Error("payload取得失敗("+r.status+")");
+  return r.json();
+}
+async function decryptBoard(pass,p){
+  const enc=new TextEncoder();
+  const km=await crypto.subtle.importKey("raw",enc.encode(pass),"PBKDF2",false,["deriveKey"]);
+  const key=await crypto.subtle.deriveKey(
+    {name:"PBKDF2",salt:b64ToBytes(p.kdf.salt),iterations:p.kdf.iter,hash:p.kdf.hash},
+    km,{name:"AES-GCM",length:256},false,["decrypt"]);
+  const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b64ToBytes(p.iv)},key,b64ToBytes(p.ct));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+
+function kpiHTML(k){
+  const cell=(v,l)=> (v==null?"":`<div class="kpi"><b>${esc(v)}</b><span>${esc(l)}</span></div>`);
+  return cell(k.total,"全タスク")+cell(k.in_progress,"進行中")+cell(k.pending,"未着手")
+       + cell(k.review,"レビュー")+cell(k.completed,"完了")+cell(k.usertask,"手動追加");
+}
+function badge(st){
+  const todo=["pending","review","awaiting","未着手","レビュー","要対応"];
+  const cls=todo.includes(st)?"b-todo":"b-prog";
+  const label={pending:"未着手",review:"レビュー",awaiting:"待ち",in_progress:"進行中"}[st]||st||"進行中";
+  return `<span class="badge ${cls}">${esc(label)}</span>`;
+}
+function sectionHTML(title,count,rows,renderRow){
+  let body = rows.length ? rows.map(renderRow).join("") : `<div class="empty">なし</div>`;
+  return `<section><div class="sh"><h3>${esc(title)}</h3><span class="c">${count}</span></div>${body}</section>`;
+}
+function render(d){
+  $("#upd").textContent = "最終更新 "+(d.updated_label||"");
+  $("#kpis").innerHTML = kpiHTML(d.kpis||{});
+  let html="";
+  html += sectionHTML("あなたのやること",(d.user_tasks||[]).length,d.user_tasks||[],t=>
+    `<div class="card"><div class="t">${esc(t.title)}</div>`+
+    `<div class="m">${badge(t.status)}${t.category?`<span class="tag">${esc(t.category)}</span>`:""}</div>`+
+    `${t.note?`<div class="note">${esc(t.note)}</div>`:""}</div>`);
+  html += sectionHTML("いま動いてる",(d.active||[]).length,d.active||[],t=>
+    `<div class="card"><div class="t">${esc(t.title)}</div>`+
+    `<div class="m">${badge(t.status)}${t.proj?`<span class="tag">${esc(t.proj)}</span>`:""}${t.hhmm?`<span class="tag">${esc(t.hhmm)}</span>`:""}</div></div>`);
+  html += sectionHTML("未着手・要対応",(d.todo||[]).length,d.todo||[],t=>
+    `<div class="card"><div class="t">${esc(t.title)}</div>`+
+    `<div class="m">${badge(t.status)}<span class="tag">${esc(t.kind_label||"")}</span>${t.proj?`<span class="tag">${esc(t.proj)}</span>`:""}</div></div>`);
+  $("#sections").innerHTML = html;
+  $("#gate").classList.add("hidden");
+  $("#app").classList.remove("hidden");
+}
+
+async function open(pass){
+  $("#err").textContent="";
+  if(!pass){return;}
+  try{
+    const p=await fetchPayload();
+    const data=await decryptBoard(pass,p);
+    // 合言葉そのものは保存しない。復号済みデータだけをセッション中キャッシュ（タブを閉じると消える）。
+    try{ sessionStorage.setItem("yb_data",JSON.stringify(data)); }catch(_){}
+    render(data);
+  }catch(e){
+    $("#err").textContent="合言葉が違うか、まだスナップショットがありません。";
+  }
+}
+$("#go").addEventListener("click",()=>open($("#pass").value));
+$("#pass").addEventListener("keydown",e=>{if(e.key==="Enter")open($("#pass").value);});
+$("#logout").addEventListener("click",()=>{sessionStorage.removeItem("yb_data");location.reload();});
+// セッション中は復号済みキャッシュを表示（合言葉の再入力不要・最新化は「合言葉を消す」→再入力）
+try{
+  const cached=sessionStorage.getItem("yb_data");
+  if(cached) render(JSON.parse(cached));
+}catch(_){}
+</script>
+</body>
+</html>

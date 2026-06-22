@@ -1,0 +1,7 @@
+.venv/
+passphrase.txt
+__pycache__/
+*.pyc
+.ghtoken
+git-askpass.sh
+*.log
